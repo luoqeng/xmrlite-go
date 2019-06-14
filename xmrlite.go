@@ -14,7 +14,7 @@ const fromAddr = "9wq792k9sxVZiLn66S3Qzv8QfmtcwkdXgM5cWGsXAPxoQeMQ79md51PLPCijvz
 const viewKey = "f747f4a4838027c9af80e6364a941b60c538e67e9ea198b6ec452b74c276de06"
 const spendKey = "509a9761fde8856fc38e79ca705d85f979143524f178f8e2e0eb539fc050e905"
 const payID = "a32497eebed8aebb5d5a633d559f7eb7e819d2da183cafe41234567890abda48"
-const sendAmout = "1000000000000"
+const sendAmount = "1000000000000"
 const toAddr = "9wq792k9sxVZiLn66S3Qzv8QfmtcwkdXgM5cWGsXAPxoQeMQ79md51PLPCijvzk1iHbuHi91pws5B7iajTX9KTtJ4bh2tCh"
 const nettype = "TESTNET"
 
@@ -33,14 +33,14 @@ type MixOut struct {
 }
 
 type UnspentOuts struct {
-	PassedInAttemptAtFee string       `json:"passedIn_attemptAt_fee"`
+	PassedInAttemptAtFee string       `json:"_"` //passedIn_attemptAt_fee
 	PaymentIdString      string       `json:"payment_id_string"`
 	SendingAmount        string       `json:"sending_amount"`
 	IsSweeping           bool         `json:"is_sweeping"`
 	Priority             string       `json:"priority"`
 	FeePerB              string       `json:"fee_per_b"`
 	FeeMask              string       `json:"fee_mask"`
-	ForkVersion          string       `json:"fork_version"`
+	ForkVersion          string       `json:"_"` //fork_version
 	UnspentOuts          []UnspentOut `json:"unspent_outs"`
 }
 
@@ -64,15 +64,16 @@ type Transaction struct {
 	FeeAmount            string       `json:"fee_amount"`
 	Priority             string       `json:"priority"`
 	FeePerB              string       `json:"fee_per_b"`
+	FeeMask              string       `json:"fee_mask"`
 	UnlockTime           string       `json:"unlock_time"`
 	NettypeString        string       `json:"nettype_string"`
-	ForkVersion          string       `json:"fork_version"`
+	ForkVersion          string       `json:"_"` //fork_version
 	UsingOuts            []UnspentOut `json:"using_outs"`
 	MixOuts              []MixOut     `json:"mix_outs"`
 }
 
 type SignedTx struct {
-	TxMustBeReconstructed bool   `json:"tx_must_be_reconstructed"`
+	TxMustBeReconstructed string `json:"tx_must_be_reconstructed"`
 	FeeActuallyNeeded     string `json:"fee_actually_needed"`
 	SerializedSignedTx    string `json:"serialized_signed_tx"`
 	TxHash                string `json:"tx_hash"`
@@ -92,12 +93,14 @@ func main() {
 	}
 
 	unspentOuts.PaymentIdString = payID
-	unspentOuts.SendingAmount = sendAmout
+	unspentOuts.SendingAmount = sendAmount
 	jsonStr, err := json.Marshal(unspentOuts)
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Printf("json: %s\n", jsonStr)
 	resDecoys := mymonero.CallFunc("send_step1__prepare_params_for_get_decoys", string(jsonStr))
+	log.Printf("decoys: %s\n", resDecoys)
 	errMsg, err := jsonparser.GetString([]byte(resDecoys), "err_msg")
 	if err == nil {
 		log.Fatal(errors.New(errMsg))
@@ -112,7 +115,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	resRandomOuts, err := cli.GetRandomOuts(amounts, 5)
+	resRandomOuts, err := cli.GetRandomOuts(amounts, 11)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -133,6 +136,7 @@ func main() {
 		FeeAmount:            decoys.UsingFee,
 		Priority:             unspentOuts.Priority,
 		FeePerB:              unspentOuts.FeePerB,
+		FeeMask:              unspentOuts.FeeMask,
 		UnlockTime:           "0",
 		NettypeString:        nettype,
 		ForkVersion:          unspentOuts.ForkVersion,
@@ -151,8 +155,8 @@ func main() {
 	}
 
 	signedTx, err := ParseSignedTx([]byte(resTx))
-	if err == nil {
-		log.Fatal(errors.New(errMsg))
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	log.Printf("%+v", signedTx)
@@ -215,7 +219,7 @@ func ParsedResGetUnspentOuts(res []byte) (*UnspentOuts, error) {
 	}
 	unspent.FeePerB = strconv.FormatInt(fee, 10)
 	unspent.FeeMask = "10000"
-	unspent.PassedInAttemptAtFee = "none"
+	unspent.PassedInAttemptAtFee = "0"
 	unspent.IsSweeping = false
 	unspent.Priority = "1"
 	unspent.ForkVersion = "0"
@@ -342,16 +346,15 @@ func ParsedResGetRandomOuts(res []byte) (mixOuts []MixOut, err error) {
 					}
 
 					var output UnspentOut
-					output.PublicKey, err = jsonparser.GetString(value, "public_key")
+					output.PublicKey, err = jsonparser.GetString(v, "public_key")
 					if err != nil {
 						return
 					}
-					output.Rct, err = jsonparser.GetString(value, "rct")
+					output.Rct, err = jsonparser.GetString(v, "rct")
 					if err != nil {
 						return
 					}
-
-					globalIndex, err := jsonparser.GetInt(value, "global_index")
+					globalIndex, err := jsonparser.GetInt(v, "global_index")
 					if err != nil {
 						return
 					}
@@ -371,11 +374,11 @@ func ParseSignedTx(res []byte) (*SignedTx, error) {
 		tx  SignedTx
 		err error
 	)
-	tx.TxMustBeReconstructed, err = jsonparser.GetBoolean(res, "tx_must_be_reconstructed")
+	tx.TxMustBeReconstructed, err = jsonparser.GetString(res, "tx_must_be_reconstructed")
 	if err != nil {
 		return nil, err
 	}
-	if tx.TxMustBeReconstructed == true {
+	if tx.TxMustBeReconstructed == "true" {
 		tx.FeeActuallyNeeded, err = jsonparser.GetString(res, "fee_actually_needed")
 		if err != nil {
 			return nil, err
