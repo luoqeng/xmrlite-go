@@ -13,9 +13,10 @@ import (
 const fromAddr = "9wq792k9sxVZiLn66S3Qzv8QfmtcwkdXgM5cWGsXAPxoQeMQ79md51PLPCijvzk1iHbuHi91pws5B7iajTX9KTtJ4bh2tCh"
 const viewKey = "f747f4a4838027c9af80e6364a941b60c538e67e9ea198b6ec452b74c276de06"
 const spendKey = "509a9761fde8856fc38e79ca705d85f979143524f178f8e2e0eb539fc050e905"
+const pubSpendKey = "7b0ca4ee4cf32ac393b0306402d71b2c4a3db02c45ffbb780c2fde677b03848d"
 const payID = "a32497eebed8aebb5d5a633d559f7eb7e819d2da183cafe41234567890abda48"
 const sendAmount = "1000000000000"
-const toAddr = "9wq792k9sxVZiLn66S3Qzv8QfmtcwkdXgM5cWGsXAPxoQeMQ79md51PLPCijvzk1iHbuHi91pws5B7iajTX9KTtJ4bh2tCh"
+const toAddr = "A2rgGdM78JEQcxEUsi761WbnJWsFRCwh1PkiGtGnUUcJTGenfCr5WEtdoXezutmPiQMsaM4zJbpdH5PMjkCt7QrXAhV8wDB"
 const nettype = "TESTNET"
 
 type UnspentOut struct {
@@ -33,14 +34,14 @@ type MixOut struct {
 }
 
 type UnspentOuts struct {
-	PassedInAttemptAtFee string       `json:"_"` //passedIn_attemptAt_fee
+	PassedInAttemptAtFee string       `json:"passedIn_attemptAt_fee"`
 	PaymentIdString      string       `json:"payment_id_string"`
 	SendingAmount        string       `json:"sending_amount"`
 	IsSweeping           bool         `json:"is_sweeping"`
 	Priority             string       `json:"priority"`
 	FeePerB              string       `json:"fee_per_b"`
 	FeeMask              string       `json:"fee_mask"`
-	ForkVersion          string       `json:"_"` //fork_version
+	ForkVersion          string       `json:"fork_version"`
 	UnspentOuts          []UnspentOut `json:"unspent_outs"`
 }
 
@@ -67,7 +68,7 @@ type Transaction struct {
 	FeeMask              string       `json:"fee_mask"`
 	UnlockTime           string       `json:"unlock_time"`
 	NettypeString        string       `json:"nettype_string"`
-	ForkVersion          string       `json:"_"` //fork_version
+	ForkVersion          string       `json:"fork_version"`
 	UsingOuts            []UnspentOut `json:"using_outs"`
 	MixOuts              []MixOut     `json:"mix_outs"`
 }
@@ -91,6 +92,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Printf("unspent len: %d\n", len(unspentOuts.UnspentOuts))
 
 	unspentOuts.PaymentIdString = payID
 	unspentOuts.SendingAmount = sendAmount
@@ -159,11 +161,21 @@ func main() {
 		log.Fatal(err)
 	}
 
-	log.Printf("%+v", signedTx)
+	signedTxStr, _ := json.Marshal(signedTx)
+	log.Printf("%s\n", signedTxStr)
+
+	if signedTx.TxMustBeReconstructed == "true" {
+		log.Fatalln("PassedInAttemptAtFee = tx.FeeActuallyNeeded; // -> reconstruction attempt's step1's PassedInAttemptAtFee")
+	}
+
+	res, err := cli.SubmitRawTx(signedTx.SerializedSignedTx)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("%s\n", res)
 }
 
 func ParsedResGetUnspentOuts(res []byte) (*UnspentOuts, error) {
-	// TODO 过滤已经使用的输出
 	var (
 		unspent UnspentOuts
 		err     error
@@ -177,6 +189,38 @@ func ParsedResGetUnspentOuts(res []byte) (*UnspentOuts, error) {
 			}
 
 			var output UnspentOut
+			output.TxPubKey, err = jsonparser.GetString(value, "tx_pub_key")
+			if err != nil {
+				return
+			}
+			index, err := jsonparser.GetInt(value, "index")
+			if err != nil {
+				return
+			}
+			output.Index = strconv.FormatInt(index, 10)
+
+			keyImage, err := GenerateKeyImage(pubSpendKey, spendKey, viewKey, output.TxPubKey, output.Index)
+			if err != nil {
+				return
+			}
+
+			isOutputSpent := false
+			jsonparser.ArrayEach(value,
+				func(spendKeyImage []byte,
+					dataType jsonparser.ValueType,
+					offset int, dataErr error) {
+					if dataErr != nil {
+						return
+					}
+					if string(spendKeyImage) == keyImage {
+						isOutputSpent = true
+					}
+				}, "spend_key_images")
+			// 过滤已经使用的输出
+			if isOutputSpent == true {
+				return
+			}
+
 			output.Amout, err = jsonparser.GetString(value, "amount")
 			if err != nil {
 				return
@@ -195,17 +239,6 @@ func ParsedResGetUnspentOuts(res []byte) (*UnspentOuts, error) {
 				return
 			}
 			output.GlobalIndex = strconv.FormatInt(globalIndex, 10)
-
-			index, err := jsonparser.GetInt(value, "index")
-			if err != nil {
-				return
-			}
-			output.Index = strconv.FormatInt(index, 10)
-
-			output.TxPubKey, err = jsonparser.GetString(value, "tx_pub_key")
-			if err != nil {
-				return
-			}
 
 			unspent.UnspentOuts = append(unspent.UnspentOuts, output)
 		}, "outputs")
@@ -404,4 +437,31 @@ func ParseSignedTx(res []byte) (*SignedTx, error) {
 	}
 
 	return &tx, nil
+}
+
+func GenerateKeyImage(pubSpendKey, secSpendKey, secViewKey, txPubKey, outIndex string) (string, error) {
+	args := make(map[string]string)
+	args["pub_spendKey_string"] = pubSpendKey
+	args["sec_spendKey_string"] = secSpendKey
+	args["sec_viewKey_string"] = secViewKey
+	args["tx_pub_key"] = txPubKey
+	args["out_index"] = outIndex
+
+	argsStr, err := json.Marshal(args)
+	if err != nil {
+		return "", err
+	}
+
+	ret := mymonero.CallFunc("generate_key_image", string(argsStr))
+
+	errMsg, err := jsonparser.GetString([]byte(ret), "err_msg")
+	if err == nil {
+		return "", errors.New(errMsg)
+	}
+
+	keyImage, err := jsonparser.GetString([]byte(ret), "retVal")
+	if err != nil {
+		return "", err
+	}
+	return keyImage, nil
 }
