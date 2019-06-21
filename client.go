@@ -29,12 +29,12 @@ func (client *Client) GetUnspentOuts(address string) ([]byte, error) {
 	return client.Call(client.url, "/get_unspent_outs", []byte(postData))
 }
 
-func (client *Client) GetRandomOuts(amounts []string, mixin uint32) ([]byte, error) {
+func (client *Client) GetRandomOuts(amounts []string) ([]byte, error) {
 	amountsByte, err := json.Marshal(amounts)
 	if err != nil {
 		return nil, err
 	}
-	postData := fmt.Sprintf(`{"amounts":%s, "count":%d}`, string(amountsByte), mixin)
+	postData := fmt.Sprintf(`{"amounts":%s, "count":%d}`, string(amountsByte), 11)
 	return client.Call(client.url, "/get_random_outs", []byte(postData))
 }
 

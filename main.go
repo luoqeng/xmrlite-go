@@ -92,7 +92,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("unspent len: %d\n", len(unspentOuts.UnspentOuts))
+	log.Printf("unspent len: %d\n\n", len(unspentOuts.UnspentOuts))
 
 	unspentOuts.PaymentIdString = payID
 	unspentOuts.SendingAmount = sendAmount
@@ -100,13 +100,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("json: %s\n", jsonStr)
+	log.Printf("req_decoys: %s\n\n", jsonStr)
 	resDecoys := mymonero.CallFunc("send_step1__prepare_params_for_get_decoys", string(jsonStr))
-	log.Printf("decoys: %s\n", resDecoys)
+	log.Printf("res_decoys: %s\n", resDecoys)
 	errMsg, err := jsonparser.GetString([]byte(resDecoys), "err_msg")
 	if err == nil {
 		log.Fatal(errors.New(errMsg))
 	}
+	return
 
 	decoys, err := ParseGetDecoys([]byte(resDecoys))
 	if err != nil {
@@ -117,7 +118,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	resRandomOuts, err := cli.GetRandomOuts(amounts, 11)
+	resRandomOuts, err := cli.GetRandomOuts(amounts)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -162,7 +163,7 @@ func main() {
 	}
 
 	signedTxStr, _ := json.Marshal(signedTx)
-	log.Printf("%s\n", signedTxStr)
+	log.Printf("%s\n\n", signedTxStr)
 
 	if signedTx.TxMustBeReconstructed == "true" {
 		log.Fatalln("PassedInAttemptAtFee = tx.FeeActuallyNeeded; // -> reconstruction attempt's step1's PassedInAttemptAtFee")
@@ -172,7 +173,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("%s\n", res)
+	log.Printf("%s\n\n", res)
 }
 
 func ParsedResGetUnspentOuts(res []byte) (*UnspentOuts, error) {
