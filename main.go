@@ -19,7 +19,7 @@ const sendAmount = "1000000000000"
 const toAddr = "A2rgGdM78JEQcxEUsi761WbnJWsFRCwh1PkiGtGnUUcJTGenfCr5WEtdoXezutmPiQMsaM4zJbpdH5PMjkCt7QrXAhV8wDB"
 const nettype = "TESTNET"
 
-type UnspentOut struct {
+type Output struct {
 	Amout       string `json:"amount"`
 	PublicKey   string `json:"public_key"`
 	Rct         string `json:"rct"`
@@ -29,48 +29,48 @@ type UnspentOut struct {
 }
 
 type MixOut struct {
-	Amout   string       `json:"amount"`
-	Outputs []UnspentOut `json:"outputs"`
+	Amout   string   `json:"amount"`
+	Outputs []Output `json:"outputs"`
 }
 
-type UnspentOuts struct {
-	PassedInAttemptAtFee string       `json:"passedIn_attemptAt_fee"`
-	PaymentIdString      string       `json:"payment_id_string"`
-	SendingAmount        string       `json:"sending_amount"`
-	IsSweeping           bool         `json:"is_sweeping"`
-	Priority             string       `json:"priority"`
-	FeePerB              string       `json:"fee_per_b"`
-	FeeMask              string       `json:"fee_mask"`
-	ForkVersion          string       `json:"fork_version"`
-	UnspentOuts          []UnspentOut `json:"unspent_outs"`
+type PrepareOuts struct {
+	PassedInAttemptAtFee string   `json:"passedIn_attemptAt_fee"`
+	PaymentIdString      string   `json:"payment_id_string"`
+	SendingAmount        string   `json:"sending_amount"`
+	IsSweeping           bool     `json:"is_sweeping"`
+	Priority             string   `json:"priority"`
+	FeePerB              string   `json:"fee_per_b"`
+	FeeMask              string   `json:"fee_mask"`
+	ForkVersion          string   `json:"fork_version"`
+	UnspentOuts          []Output `json:"unspent_outs"`
 }
 
 type Decoys struct {
-	Mixin           string       `json:"mixin"`
-	UsingFee        string       `json:"using_fee"`
-	FinalTotalWoFee string       `json:"final_total_wo_fee"`
-	ChangeAmount    string       `json:"change_amount"`
-	UsingOuts       []UnspentOut `json:"using_outs"`
+	Mixin           string   `json:"mixin"`
+	UsingFee        string   `json:"using_fee"`
+	FinalTotalWoFee string   `json:"final_total_wo_fee"`
+	ChangeAmount    string   `json:"change_amount"`
+	UsingOuts       []Output `json:"using_outs"`
 }
 
 type Transaction struct {
-	PassedInAttemptAtFee string       `json:"passedIn_attemptAt_fee"`
-	FromAddressString    string       `json:"from_address_string"`
-	SecViewKeyString     string       `json:"sec_viewKey_string"`
-	SecSpendKeyString    string       `json:"sec_spendKey_string"`
-	ToAddressString      string       `json:"to_address_string"`
-	PaymentIdString      string       `json:"payment_id_string"`
-	FinalTotalWoFee      string       `json:"final_total_wo_fee"`
-	ChangeAmount         string       `json:"change_amount"`
-	FeeAmount            string       `json:"fee_amount"`
-	Priority             string       `json:"priority"`
-	FeePerB              string       `json:"fee_per_b"`
-	FeeMask              string       `json:"fee_mask"`
-	UnlockTime           string       `json:"unlock_time"`
-	NettypeString        string       `json:"nettype_string"`
-	ForkVersion          string       `json:"fork_version"`
-	UsingOuts            []UnspentOut `json:"using_outs"`
-	MixOuts              []MixOut     `json:"mix_outs"`
+	PassedInAttemptAtFee string   `json:"passedIn_attemptAt_fee"`
+	FromAddressString    string   `json:"from_address_string"`
+	SecViewKeyString     string   `json:"sec_viewKey_string"`
+	SecSpendKeyString    string   `json:"sec_spendKey_string"`
+	ToAddressString      string   `json:"to_address_string"`
+	PaymentIdString      string   `json:"payment_id_string"`
+	FinalTotalWoFee      string   `json:"final_total_wo_fee"`
+	ChangeAmount         string   `json:"change_amount"`
+	FeeAmount            string   `json:"fee_amount"`
+	Priority             string   `json:"priority"`
+	FeePerB              string   `json:"fee_per_b"`
+	FeeMask              string   `json:"fee_mask"`
+	UnlockTime           string   `json:"unlock_time"`
+	NettypeString        string   `json:"nettype_string"`
+	ForkVersion          string   `json:"fork_version"`
+	UsingOuts            []Output `json:"using_outs"`
+	MixOuts              []MixOut `json:"mix_outs"`
 }
 
 type SignedTx struct {
@@ -88,15 +88,15 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	unspentOuts, err := ParsedResGetUnspentOuts(resUnspentOuts)
+	prepareOuts, err := ParsedResGetUnspentOuts(resUnspentOuts)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("unspent len: %d\n\n", len(unspentOuts.UnspentOuts))
+	log.Printf("unspent len: %d\n\n", len(prepareOuts.UnspentOuts))
 
-	unspentOuts.PaymentIdString = payID
-	unspentOuts.SendingAmount = sendAmount
-	jsonStr, err := json.Marshal(unspentOuts)
+	prepareOuts.PaymentIdString = payID
+	prepareOuts.SendingAmount = sendAmount
+	jsonStr, err := json.Marshal(prepareOuts)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -107,7 +107,6 @@ func main() {
 	if err == nil {
 		log.Fatal(errors.New(errMsg))
 	}
-	return
 
 	decoys, err := ParseGetDecoys([]byte(resDecoys))
 	if err != nil {
@@ -128,7 +127,7 @@ func main() {
 	}
 
 	tx := Transaction{
-		PassedInAttemptAtFee: unspentOuts.PassedInAttemptAtFee,
+		PassedInAttemptAtFee: prepareOuts.PassedInAttemptAtFee,
 		FromAddressString:    fromAddr,
 		SecViewKeyString:     viewKey,
 		SecSpendKeyString:    spendKey,
@@ -137,12 +136,12 @@ func main() {
 		FinalTotalWoFee:      decoys.FinalTotalWoFee,
 		ChangeAmount:         decoys.ChangeAmount,
 		FeeAmount:            decoys.UsingFee,
-		Priority:             unspentOuts.Priority,
-		FeePerB:              unspentOuts.FeePerB,
-		FeeMask:              unspentOuts.FeeMask,
+		Priority:             prepareOuts.Priority,
+		FeePerB:              prepareOuts.FeePerB,
+		FeeMask:              prepareOuts.FeeMask,
 		UnlockTime:           "0",
 		NettypeString:        nettype,
-		ForkVersion:          unspentOuts.ForkVersion,
+		ForkVersion:          prepareOuts.ForkVersion,
 		UsingOuts:            decoys.UsingOuts,
 		MixOuts:              mixOuts,
 	}
@@ -157,6 +156,7 @@ func main() {
 		log.Fatal(errors.New(errMsg))
 	}
 
+	log.Printf("%s\n\n", resTx)
 	signedTx, err := ParseSignedTx([]byte(resTx))
 	if err != nil {
 		log.Fatal(err)
@@ -176,9 +176,9 @@ func main() {
 	log.Printf("%s\n\n", res)
 }
 
-func ParsedResGetUnspentOuts(res []byte) (*UnspentOuts, error) {
+func ParsedResGetUnspentOuts(res []byte) (*PrepareOuts, error) {
 	var (
-		unspent UnspentOuts
+		unspent PrepareOuts
 		err     error
 	)
 	jsonparser.ArrayEach(res,
@@ -189,8 +189,8 @@ func ParsedResGetUnspentOuts(res []byte) (*UnspentOuts, error) {
 				return
 			}
 
-			var output UnspentOut
-			output.TxPubKey, err = jsonparser.GetString(value, "tx_pub_key")
+			var out Output
+			out.TxPubKey, err = jsonparser.GetString(value, "tx_pub_key")
 			if err != nil {
 				return
 			}
@@ -198,9 +198,9 @@ func ParsedResGetUnspentOuts(res []byte) (*UnspentOuts, error) {
 			if err != nil {
 				return
 			}
-			output.Index = strconv.FormatInt(index, 10)
+			out.Index = strconv.FormatInt(index, 10)
 
-			keyImage, err := GenerateKeyImage(pubSpendKey, spendKey, viewKey, output.TxPubKey, output.Index)
+			keyImage, err := GenerateKeyImage(pubSpendKey, spendKey, viewKey, out.TxPubKey, out.Index)
 			if err != nil {
 				return
 			}
@@ -222,15 +222,15 @@ func ParsedResGetUnspentOuts(res []byte) (*UnspentOuts, error) {
 				return
 			}
 
-			output.Amout, err = jsonparser.GetString(value, "amount")
+			out.Amout, err = jsonparser.GetString(value, "amount")
 			if err != nil {
 				return
 			}
-			output.PublicKey, err = jsonparser.GetString(value, "public_key")
+			out.PublicKey, err = jsonparser.GetString(value, "public_key")
 			if err != nil {
 				return
 			}
-			output.Rct, err = jsonparser.GetString(value, "rct")
+			out.Rct, err = jsonparser.GetString(value, "rct")
 			if err != nil {
 				return
 			}
@@ -239,9 +239,9 @@ func ParsedResGetUnspentOuts(res []byte) (*UnspentOuts, error) {
 			if err != nil {
 				return
 			}
-			output.GlobalIndex = strconv.FormatInt(globalIndex, 10)
+			out.GlobalIndex = strconv.FormatInt(globalIndex, 10)
 
-			unspent.UnspentOuts = append(unspent.UnspentOuts, output)
+			unspent.UnspentOuts = append(unspent.UnspentOuts, out)
 		}, "outputs")
 
 	if err != nil {
@@ -379,12 +379,12 @@ func ParsedResGetRandomOuts(res []byte) (mixOuts []MixOut, err error) {
 						return
 					}
 
-					var output UnspentOut
-					output.PublicKey, err = jsonparser.GetString(v, "public_key")
+					var out Output
+					out.PublicKey, err = jsonparser.GetString(v, "public_key")
 					if err != nil {
 						return
 					}
-					output.Rct, err = jsonparser.GetString(v, "rct")
+					out.Rct, err = jsonparser.GetString(v, "rct")
 					if err != nil {
 						return
 					}
@@ -392,9 +392,9 @@ func ParsedResGetRandomOuts(res []byte) (mixOuts []MixOut, err error) {
 					if err != nil {
 						return
 					}
-					output.GlobalIndex = strconv.FormatInt(globalIndex, 10)
+					out.GlobalIndex = strconv.FormatInt(globalIndex, 10)
 
-					mixOut.Outputs = append(mixOut.Outputs, output)
+					mixOut.Outputs = append(mixOut.Outputs, out)
 				}, "outputs")
 
 			mixOuts = append(mixOuts, mixOut)
